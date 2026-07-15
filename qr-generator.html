@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Generator — Sunset Horizons</title>
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --border: #2a333b; --text: #e7edf2;
+    --muted: #93a3af; --accent: #f2a900; --accent2: #4fa3e0; --good: #4caf7d; --bad: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px 24px 60px; }
+  textarea, input, button, select { font-size: 0.95rem; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #1d262d; color: var(--text); font-family: inherit; }
+  textarea { width: 100%; min-height: 140px; resize: vertical; }
+  button { background: var(--accent); color: #1a1200; font-weight: 600; border: none; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: #1d262d; color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .hint { color: var(--muted); font-size: 0.82rem; margin: 8px 0 20px; }
+  .hint code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+  #status { color: var(--muted); font-size: 0.9rem; min-height: 1.2em; margin: 14px 0; }
+  #status.error { color: var(--bad); }
+  #resultsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; }
+  .result-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .result-card.error-card { border-color: var(--bad); }
+  .result-card img.qr { width: 100%; max-width: 220px; margin: 0 auto 12px; display: block; image-rendering: pixelated; }
+  .result-card .addr { font-size: 0.85rem; margin-bottom: 4px; font-weight: 600; }
+  .result-card .contractor { font-size: 0.78rem; color: var(--muted); margin-bottom: 12px; }
+  .result-card .row { display: flex; gap: 6px; }
+  .result-card .row button { flex: 1; font-size: 0.8rem; padding: 8px; }
+  .result-card .error-text { color: var(--bad); font-size: 0.85rem; }
+</style>
+<link rel="stylesheet" href="gate.css">
+</head>
+<body>
+<div id="gate">
+  <div class="gate-card">
+    <h2>Sunset Horizons</h2>
+    <p>Enter the passphrase to continue.</p>
+    <input type="password" id="gatePassphrase" placeholder="Passphrase" autocomplete="off">
+    <button id="gateSubmit">Unlock</button>
+    <div id="gateError"></div>
+  </div>
+</div>
+<div id="appContent">
+<header>
+  <h1>Batch QR Generator</h1>
+  <p>Paste one property per line to generate a report link + QR code for each.</p>
+</header>
+<main>
+  <textarea id="inputArea" placeholder="2424 Courthouse Drive, Virginia Beach, VA | example-co&#10;123 Main St, Virginia Beach, VA | example-co"></textarea>
+  <p class="hint">
+    One address per line, formatted <code>address | contractor-code</code>.
+    Available contractor codes: <span id="contractorCodes"></span>.
+    Addresses are geocoded one at a time (about 1 per second) to stay within the free geocoding service's usage limits — bigger batches take longer.
+  </p>
+  <button id="generateBtn">Generate QR Codes</button>
+  <div id="status"></div>
+  <div id="resultsGrid"></div>
+</main>
+</div>
+
+<script src="gate.js"></script>
+<script src="sun-lib.js"></script>
+<script src="contractors.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script>
+const statusEl = $('status');
+const grid = $('resultsGrid');
+
+$('contractorCodes').textContent = Object.keys(CONTRACTORS).map(c => `"${c}"`).join(', ') || '(none configured yet)';
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg || '';
+  statusEl.className = isError ? 'error' : '';
+}
+
+function reportUrl(lat, lon, addr, contractorCode) {
+  const base = window.location.href.replace(/qr-generator\.html.*$/, 'report.html');
+  const params = new URLSearchParams();
+  params.set('a', `${lat.toFixed(6)},${lon.toFixed(6)}`);
+  params.set('addr', addr);
+  if (contractorCode) params.set('c', contractorCode);
+  return `${base}?${params.toString()}`;
+}
+
+function makeQrDataUrl(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(8, 32);
+}
+
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'property';
+}
+
+function renderErrorCard(rawLine, message) {
+  const card = document.createElement('div');
+  card.className = 'result-card error-card';
+  card.innerHTML = `
+    <div class="addr">${rawLine}</div>
+    <div class="error-text">${message}</div>
+  `;
+  grid.appendChild(card);
+}
+
+function renderResultCard(addr, contractorCode, url, qrDataUrl) {
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const contractorName = CONTRACTORS[contractorCode] ? CONTRACTORS[contractorCode].name : (contractorCode ? `Unknown code "${contractorCode}"` : 'No contractor set');
+  card.innerHTML = `
+    <img class="qr" src="${qrDataUrl}" alt="QR code for ${addr}">
+    <div class="addr">${addr}</div>
+    <div class="contractor">${contractorName}</div>
+    <div class="row">
+      <button class="secondary copy-btn">Copy link</button>
+      <button class="download-btn">Download QR</button>
+    </div>
+  `;
+  card.querySelector('.copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(url);
+    const btn = card.querySelector('.copy-btn');
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+  card.querySelector('.download-btn').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = qrDataUrl;
+    a.download = `qr-${slugify(addr)}.gif`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  grid.appendChild(card);
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function generateAll() {
+  const lines = $('inputArea').value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { setStatus('Paste at least one address first.', true); return; }
+
+  $('generateBtn').disabled = true;
+  grid.innerHTML = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    setStatus(`Processing ${i + 1} of ${lines.length}…`);
+    const parts = line.split('|').map(s => s.trim());
+    const address = parts[0];
+    const contractorCode = parts[1] || '';
+
+    if (!address) { renderErrorCard(line, 'Empty address.'); continue; }
+
+    try {
+      const loc = await geocode(address);
+      const url = reportUrl(loc.lat, loc.lon, loc.display, contractorCode);
+      const qrDataUrl = makeQrDataUrl(url);
+      renderResultCard(loc.display, contractorCode, url, qrDataUrl);
+    } catch (err) {
+      renderErrorCard(line, err.message || 'Failed to process this line.');
+    }
+
+    if (i < lines.length - 1) await sleep(1100); // stay under Nominatim's 1 req/sec limit
+  }
+
+  setStatus(`Done — ${lines.length} address${lines.length === 1 ? '' : 'es'} processed.`);
+  $('generateBtn').disabled = false;
+}
+
+$('generateBtn').addEventListener('click', generateAll);
+</script>
+</body>
+</html>

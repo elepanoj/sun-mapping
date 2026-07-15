@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Sun Exposure Report</title>
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --border: #2a333b; --text: #e7edf2;
+    --muted: #93a3af; --accent: #f2a900; --accent2: #4fa3e0; --good: #4caf7d; --bad: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 20px 60px; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  .addr-line { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+  section.block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  section.block h2 { margin: 0 0 12px; font-size: 1rem; }
+  .gauge-card { display: flex; justify-content: center; }
+  .gauge-card svg { width: 100%; max-width: 440px; height: auto; display: block; }
+
+  /* Contractor CTA card */
+  .cta-card {
+    background: linear-gradient(180deg, #1d2027, var(--panel));
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 24px 20px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .cta-card img.logo { max-width: 140px; max-height: 90px; margin: 0 auto 12px; display: block; }
+  .cta-card .cta-label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px; }
+  .cta-card h2 { margin: 0 0 16px; font-size: 1.2rem; }
+  .call-btn {
+    display: block; width: 100%; box-sizing: border-box;
+    background: var(--accent); color: #1a1200; font-weight: 700; font-size: 1.05rem;
+    text-decoration: none; border-radius: 10px; padding: 16px; min-height: 44px;
+  }
+  .call-btn:hover { filter: brightness(1.08); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .card .value { font-size: 1.15rem; font-weight: 600; margin-top: 4px; }
+  svg#sunpath { width: 100%; height: 160px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .cloud-bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--accent2); vertical-align: middle; margin-right: 6px; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .slider-row input[type=range] { flex: 1; }
+  .slider-row .time-label { min-width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+  iframe#shadeFrame { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 8px; }
+
+  #loadingMsg { color: var(--muted); font-size: 0.9rem; padding: 40px 0; text-align: center; }
+  #errorMsg { display: none; color: var(--bad); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+  #results { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div id="loadingMsg">Loading your report…</div>
+  <div id="errorMsg"></div>
+
+  <div id="results">
+    <h1 id="addrHeading"></h1>
+    <p class="addr-line">Sun exposure report — generated today</p>
+
+    <section class="block">
+      <div class="gauge-card" id="heatGaugeWrap"></div>
+    </section>
+
+    <div class="cta-card" id="ctaCard">
+      <img class="logo" id="contractorLogo" alt="">
+      <p class="cta-label">This report was sent to you by</p>
+      <h2 id="contractorName"></h2>
+      <a class="call-btn" id="callBtn" href="tel:">Call <span id="callPhoneDisplay"></span></a>
+    </div>
+
+    <div class="cards" id="sunCards"></div>
+
+    <section class="block">
+      <h2>Sun path (altitude through the day)</h2>
+      <svg id="sunpath" viewBox="0 0 600 160" preserveAspectRatio="none"></svg>
+    </section>
+
+    <section class="block">
+      <h2>7-day forecast</h2>
+      <table id="forecastTable">
+        <thead><tr><th>Day</th><th>Cloud cover</th><th>Sunshine</th><th>Rain chance</th><th>High / Low</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="block">
+      <h2>Live shade simulation</h2>
+      <div class="slider-row">
+        <span>🕐</span>
+        <input type="range" id="timeSlider" min="0" max="1439" step="15" value="720">
+        <span class="time-label" id="timeLabel"></span>
+      </div>
+      <iframe id="shadeFrame" allow="fullscreen"></iframe>
+      <p style="color:var(--muted); font-size:0.82rem; margin-top:8px;">
+        Live embed of <a href="https://shademap.app" target="_blank" style="color:var(--accent2)">ShadeMap</a> — drag inside the map to orbit/tilt, or use the slider above to scrub the time of day.
+      </p>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+<script src="sun-lib.js"></script>
+<script src="contractors.js"></script>
+<script>
+let reportLoc = null; // { lat, lon }
+
+function showError(msg) {
+  $('loadingMsg').style.display = 'none';
+  const el = $('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function getParams() {
+  const params = new URLSearchParams(window.location.search);
+  const a = params.get('a');
+  if (!a) return null;
+  const parts = a.split(',');
+  const lat = parseFloat(parts[0]);
+  const lon = parseFloat(parts[1]);
+  if (!isFinite(lat) || !isFinite(lon)) return null;
+  return {
+    lat, lon,
+    addr: params.get('addr') || `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+    contractorCode: params.get('c') || '',
+  };
+}
+
+function renderContractor(code) {
+  const c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS[code] : null;
+  if (!c) {
+    $('ctaCard').style.display = 'none';
+    return;
+  }
+  $('contractorLogo').src = c.logo;
+  $('contractorLogo').alt = c.name;
+  $('contractorName').textContent = c.name;
+  $('callBtn').href = `tel:${c.phone}`;
+  $('callPhoneDisplay').textContent = c.phoneDisplay || c.phone;
+}
+
+function updateShadeFrame() {
+  if (!reportLoc) return;
+  const mins = parseInt($('timeSlider').value, 10);
+  const d = new Date();
+  d.setHours(0, mins, 0, 0);
+  $('timeLabel').textContent = fmtTime(d);
+  $('shadeFrame').src = shadeMapUrl(reportLoc.lat, reportLoc.lon, d);
+}
+
+async function run() {
+  const params = getParams();
+  if (!params) {
+    showError('This report link looks incomplete. Please rescan the QR code, or contact us directly.');
+    return;
+  }
+  const { lat, lon, addr, contractorCode } = params;
+  reportLoc = { lat, lon };
+
+  renderContractor(contractorCode);
+  $('addrHeading').textContent = addr;
+
+  const date = new Date();
+  const times = SunCalc.getTimes(date, lat, lon);
+  renderSunCards('sunCards', times);
+  renderSunPath('sunpath', date, lat, lon, times.sunrise.getTime(), times.sunset.getTime());
+
+  const forecast = await getForecast(lat, lon);
+  renderForecast('#forecastTable', forecast);
+
+  const dateStr = localDateStr(date);
+  const dayIdx = Math.max(0, forecast.daily.time.indexOf(dateStr));
+  const highTemp = forecast.daily.temperature_2m_max[dayIdx];
+  const daylightHours = (times.sunset - times.sunrise) / 3600000;
+  const sunshineHours = forecast.daily.sunshine_duration[dayIdx] / 3600;
+  const sunshineRatio = Math.min(1, sunshineHours / daylightHours);
+  const solarNoonPos = SunCalc.getPosition(times.solarNoon, lat, lon);
+  const altitudeDeg = solarNoonPos.altitude * 180 / Math.PI;
+  const heatScore = computeHeatScore(highTemp, sunshineRatio, altitudeDeg);
+  renderHeatGauge('heatGaugeWrap', { score: heatScore, altitudeDeg, address: addr });
+
+  const solarNoonMinutes = times.solarNoon.getHours() * 60 + times.solarNoon.getMinutes();
+  $('timeSlider').value = solarNoonMinutes;
+  updateShadeFrame();
+
+  $('timeSlider').addEventListener('input', updateShadeFrame);
+
+  $('loadingMsg').style.display = 'none';
+  $('results').style.display = 'block';
+}
+
+run().catch(err => showError(err.message || 'Something went wrong loading this report.'));
+</script>
+</body>
+</html>
