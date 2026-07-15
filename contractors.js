@@ -1,19 +1,22 @@
-// Contractor directory — one entry per contractor you send leads to.
-//
-// The object key ("code") is what goes into the QR code URL, so keep it
-// short and URL-safe: lowercase letters, numbers, hyphens only.
-//
-// phone: E.164 format (+1 followed by the 10-digit number, no spaces/dashes)
-//   so the tel: link works reliably on every phone.
-// logo: path to an image file, relative to this file. Put logo files in
-//   the logos/ folder. Recommended: square-ish PNG or SVG, transparent
-//   background, at least 200x200px.
+// Runtime contractor directory, loaded from Supabase (see contractors.html to
+// manage entries). Populated by loadContractors() before anything reads it.
+// Shape matches the old hardcoded version so existing call sites didn't need
+// to change: CONTRACTORS[code] = { name, phone, phoneDisplay, logo }.
+let CONTRACTORS = {};
 
-const CONTRACTORS = {
-  'example-co': {
-    name: 'Example Contracting Co.',
-    phone: '+17575551234',
-    phoneDisplay: '(757) 555-1234',
-    logo: 'logos/example-co.svg',
-  },
-};
+async function loadContractors() {
+  const { data, error } = await supabaseClient.from('contractors').select('*');
+  if (error) {
+    console.error('Failed to load contractors:', error.message);
+    return;
+  }
+  CONTRACTORS = {};
+  (data || []).forEach(c => {
+    CONTRACTORS[c.code] = {
+      name: c.name,
+      phone: c.phone,
+      phoneDisplay: c.phone_display,
+      logo: c.logo_url,
+    };
+  });
+}

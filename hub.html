@@ -47,6 +47,7 @@
   #tableWrap { display: none; overflow-x: auto; }
 </style>
 <link rel="stylesheet" href="gate.css">
+<link rel="stylesheet" href="nav.css">
 </head>
 <body>
 <div id="gate">
@@ -59,6 +60,7 @@
   </div>
 </div>
 <div id="appContent">
+<nav id="mainNav" class="main-nav"></nav>
 <header>
   <div>
     <h1>Leads Hub</h1>
@@ -104,6 +106,7 @@
 </div>
 
 <script src="gate.js"></script>
+<script src="nav.js"></script>
 <script src="sun-lib.js"></script>
 <script src="contractors.js"></script>
 <script src="vendor/qrcode.js"></script>
@@ -263,7 +266,8 @@ async function loadLeads() {
   document.getElementById('searchInput').addEventListener('input', applyFilter);
 }
 
-loadLeads();
+renderNav('leads');
+loadContractors().then(loadLeads);
 </script>
 </body>
 </html>

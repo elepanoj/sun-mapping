@@ -109,7 +109,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script src="sun-lib.js"></script>
-<script src="contractors.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-config.js"></script>
 <script>
@@ -139,17 +138,21 @@ async function loadLead() {
   };
 }
 
-function renderContractor(code) {
-  const c = (typeof CONTRACTORS !== 'undefined') ? CONTRACTORS[code] : null;
+async function renderContractor(code) {
+  if (!code) {
+    $('ctaCard').style.display = 'none';
+    return;
+  }
+  const { data: c } = await supabaseClient.from('contractors').select('*').eq('code', code).single();
   if (!c) {
     $('ctaCard').style.display = 'none';
     return;
   }
-  $('contractorLogo').src = c.logo;
+  $('contractorLogo').src = c.logo_url;
   $('contractorLogo').alt = c.name;
   $('contractorName').textContent = c.name;
   $('callBtn').href = `tel:${c.phone}`;
-  $('callPhoneDisplay').textContent = c.phoneDisplay || c.phone;
+  $('callPhoneDisplay').textContent = c.phone_display || c.phone;
 }
 
 function updateShadeFrame() {
@@ -170,7 +173,7 @@ async function run() {
   const { lat, lon, addr, contractorCode } = lead;
   reportLoc = { lat, lon };
 
-  renderContractor(contractorCode);
+  await renderContractor(contractorCode);
   $('addrHeading').textContent = addr;
 
   const date = new Date();

@@ -60,6 +60,7 @@
   }
 </style>
 <link rel="stylesheet" href="gate.css">
+<link rel="stylesheet" href="nav.css">
 </head>
 <body>
 <div id="gate">
@@ -72,6 +73,7 @@
   </div>
 </div>
 <div id="appContent">
+<nav id="mainNav" class="main-nav"></nav>
 <header>
   <h1>Sun &amp; Shade Property Previewer</h1>
   <p>Type an address to pull sun hours, a live shade simulation, and a weather forecast for the property.</p>
@@ -155,6 +157,7 @@
 </div>
 
 <script src="gate.js"></script>
+<script src="nav.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script src="sun-lib.js"></script>
 <script src="contractors.js"></script>
@@ -186,7 +189,9 @@ function populateContractorSelect() {
   $('contractorSelect').innerHTML = '<option value="">No contractor (unassigned)</option>' +
     Object.entries(CONTRACTORS).map(([code, c]) => `<option value="${code}">${c.name}</option>`).join('');
 }
-populateContractorSelect();
+
+renderNav('new');
+loadContractors().then(populateContractorSelect);
 
 async function saveLead() {
   if (!currentLoc) return;
