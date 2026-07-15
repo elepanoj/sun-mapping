@@ -83,7 +83,12 @@
       </div>
       <div>
         <label for="newLogoUrl">Logo URL</label>
-        <input type="text" id="newLogoUrl" placeholder="logos/example-co.svg">
+        <input type="text" id="newLogoUrl" placeholder="Paste a URL, or upload a file →">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <input type="file" accept="image/*" id="newLogoFile" style="display:none;" onchange="handleLogoFileChange(this, 'newLogoUrl', 'addStatus')">
+        <button type="button" class="secondary" onclick="document.getElementById('newLogoFile').click()">Upload logo file</button>
       </div>
       <div>
         <button id="addBtn">Add contractor</button>
@@ -130,6 +135,30 @@ document.getElementById('newName').addEventListener('input', (e) => {
   document.getElementById('newCode').value = slugify(e.target.value);
 });
 
+async function uploadLogoFile(file, targetInputId, statusElId) {
+  const statusEl = document.getElementById(statusElId);
+  const prevStatus = statusEl.textContent;
+  statusEl.textContent = 'Uploading logo…';
+  statusEl.className = '';
+  const objectName = `${Date.now()}-${file.name}`;
+  const { error } = await supabaseClient.storage.from('contractor-logos').upload(objectName, file);
+  if (error) {
+    statusEl.textContent = 'Logo upload error: ' + error.message;
+    statusEl.className = 'error';
+    return;
+  }
+  const url = supabaseClient.storage.from('contractor-logos').getPublicUrl(objectName).data.publicUrl;
+  document.getElementById(targetInputId).value = url;
+  statusEl.textContent = 'Logo uploaded.';
+}
+
+async function handleLogoFileChange(inputEl, targetInputId, statusElId) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  await uploadLogoFile(file, targetInputId, statusElId);
+  inputEl.value = '';
+}
+
 function renderRow(c) {
   if (editingCode === c.code) {
     return `
@@ -140,7 +169,9 @@ function renderRow(c) {
         <td>
           <input type="text" id="edit-phone-${c.code}" value="${c.phone.replace(/"/g, '&quot;')}" placeholder="+17575551234" style="margin-bottom:4px;">
           <input type="text" id="edit-phone-display-${c.code}" value="${c.phone_display.replace(/"/g, '&quot;')}" placeholder="(757) 555-1234">
-          <input type="text" id="edit-logo-${c.code}" value="${(c.logo_url || '').replace(/"/g, '&quot;')}" placeholder="Logo URL" style="margin-top:4px;">
+          <input type="text" id="edit-logo-${c.code}" value="${(c.logo_url || '').replace(/"/g, '&quot;')}" placeholder="Logo URL" style="margin-top:4px; margin-bottom:4px;">
+          <input type="file" accept="image/*" style="display:none;" id="edit-logo-file-${c.code}" onchange="handleLogoFileChange(this, 'edit-logo-${c.code}', 'edit-status-${c.code}')">
+          <button type="button" class="small secondary" onclick="document.getElementById('edit-logo-file-${c.code}').click()">Upload file</button>
         </td>
         <td>
           <div class="row-actions">

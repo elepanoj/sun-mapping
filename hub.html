@@ -45,6 +45,18 @@
   #status.error { color: var(--bad); }
   #emptyState { color: var(--muted); font-size: 0.9rem; padding: 40px 0; text-align: center; display: none; }
   #tableWrap { display: none; overflow-x: auto; }
+  .folder-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .folder-pill { display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; user-select: none; }
+  .folder-pill:hover { border-color: var(--accent2); }
+  .folder-pill.active { background: var(--accent); color: #1a1200; border-color: var(--accent); }
+  .folder-pill.dragover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .folder-pill .count { opacity: 0.7; font-size: 0.76rem; }
+  .folder-pill .del-folder { opacity: 0.55; margin-left: 2px; padding: 0 2px; }
+  .folder-pill .del-folder:hover { opacity: 1; color: var(--bad); }
+  .new-folder-form { display: flex; gap: 6px; align-items: center; }
+  .new-folder-form input { padding: 6px 10px; font-size: 0.82rem; width: 150px; }
+  tr[draggable="true"] { cursor: grab; }
+  tr.dragging { opacity: 0.4; }
 </style>
 <link rel="stylesheet" href="gate.css">
 <link rel="stylesheet" href="nav.css">
@@ -82,6 +94,9 @@
       <div class="stat"><div class="value" id="unassignedCount">0</div><div class="label">Unassigned</div></div>
     </div>
 
+    <div class="folder-bar" id="folderBar"></div>
+    <p style="color:var(--muted); font-size:0.78rem; margin:-10px 0 16px;">Drag a lead's row onto a folder to move it there.</p>
+
     <div class="filter-row">
       <input type="text" id="searchInput" placeholder="Search by address or contractor…">
     </div>
@@ -115,7 +130,98 @@
 <script src="supabase-config.js"></script>
 <script>
 let allLeads = [];
+let allFolders = [];
 let editingId = null;
+let activeFolderFilter = 'all'; // 'all' | 'unsorted' | folder id
+
+function renderFolderBar() {
+  const pills = [];
+
+  pills.push(`<div class="folder-pill ${activeFolderFilter === 'all' ? 'active' : ''}" onclick="setFolderFilter('all')">All Leads <span class="count">${allLeads.length}</span></div>`);
+
+  const unsortedCount = allLeads.filter(l => !l.folder_id).length;
+  pills.push(`
+    <div class="folder-pill ${activeFolderFilter === 'unsorted' ? 'active' : ''}"
+      ondragover="handleFolderDragOver(event)" ondragleave="handleFolderDragLeave(event)" ondrop="handleFolderDrop(event, null)"
+      onclick="setFolderFilter('unsorted')">
+      Unsorted <span class="count">${unsortedCount}</span>
+    </div>`);
+
+  allFolders.forEach(f => {
+    const count = allLeads.filter(l => l.folder_id === f.id).length;
+    pills.push(`
+      <div class="folder-pill ${activeFolderFilter === f.id ? 'active' : ''}"
+        ondragover="handleFolderDragOver(event)" ondragleave="handleFolderDragLeave(event)" ondrop="handleFolderDrop(event, '${f.id}')"
+        onclick="setFolderFilter('${f.id}')">
+        📁 ${f.name} <span class="count">${count}</span>
+        <span class="del-folder" onclick="event.stopPropagation(); deleteFolder('${f.id}')">✕</span>
+      </div>`);
+  });
+
+  pills.push(`
+    <div class="new-folder-form">
+      <input type="text" id="newFolderName" placeholder="New folder name…" onkeydown="if(event.key==='Enter') createFolder()">
+      <button class="small secondary" type="button" onclick="createFolder()">+ Add</button>
+    </div>`);
+
+  document.getElementById('folderBar').innerHTML = pills.join('');
+}
+
+function setFolderFilter(filter) {
+  activeFolderFilter = filter;
+  renderFolderBar();
+  applyFilter();
+}
+
+async function createFolder() {
+  const input = document.getElementById('newFolderName');
+  const name = input.value.trim();
+  if (!name) return;
+  const { data, error } = await supabaseClient.from('lead_folders').insert({ name }).select().single();
+  if (error) { alert('Error creating folder: ' + error.message); return; }
+  allFolders.push(data);
+  renderFolderBar();
+}
+
+async function deleteFolder(id) {
+  const folder = allFolders.find(f => f.id === id);
+  if (!folder) return;
+  if (!confirm(`Delete folder "${folder.name}"? Leads inside will move back to Unsorted.`)) return;
+  const { error } = await supabaseClient.from('lead_folders').delete().eq('id', id);
+  if (error) { alert('Error deleting folder: ' + error.message); return; }
+  allFolders = allFolders.filter(f => f.id !== id);
+  allLeads.forEach(l => { if (l.folder_id === id) l.folder_id = null; });
+  if (activeFolderFilter === id) activeFolderFilter = 'all';
+  renderFolderBar();
+  applyFilter();
+}
+
+function handleDragStart(e, leadId) {
+  e.dataTransfer.setData('text/plain', leadId);
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleFolderDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('dragover');
+}
+
+function handleFolderDragLeave(e) {
+  e.currentTarget.classList.remove('dragover');
+}
+
+async function handleFolderDrop(e, folderId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const leadId = e.dataTransfer.getData('text/plain');
+  if (!leadId) return;
+  const { error } = await supabaseClient.from('leads').update({ folder_id: folderId }).eq('id', leadId);
+  if (error) { alert('Error moving lead: ' + error.message); return; }
+  const lead = allLeads.find(l => l.id === leadId);
+  if (lead) lead.folder_id = folderId;
+  renderFolderBar();
+  applyFilter();
+}
 
 function contractorLabel(code) {
   if (!code) return '<span class="contractor-tag unassigned">Unassigned</span>';
@@ -163,7 +269,7 @@ function renderRow(lead) {
   }
 
   return `
-    <tr>
+    <tr draggable="true" ondragstart="handleDragStart(event, '${lead.id}')">
       <td class="qr">${qrImgCell}${qrDownloadLink}</td>
       <td class="addr">${lead.address}</td>
       <td>${contractorLabel(lead.contractor_code)}</td>
@@ -179,9 +285,13 @@ function renderRows(leads) {
 }
 
 function currentFilteredLeads() {
+  let leads = allLeads;
+  if (activeFolderFilter === 'unsorted') leads = leads.filter(l => !l.folder_id);
+  else if (activeFolderFilter !== 'all') leads = leads.filter(l => l.folder_id === activeFolderFilter);
+
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  if (!q) return allLeads;
-  return allLeads.filter(lead => {
+  if (!q) return leads;
+  return leads.filter(lead => {
     const contractorName = lead.contractor_code && CONTRACTORS[lead.contractor_code] ? CONTRACTORS[lead.contractor_code].name : (lead.contractor_code || '');
     return lead.address.toLowerCase().includes(q) || contractorName.toLowerCase().includes(q);
   });
@@ -238,11 +348,17 @@ async function saveEdit(id) {
   }
 }
 
+async function loadFolders() {
+  const { data, error } = await supabaseClient.from('lead_folders').select('*').order('name');
+  if (error) { console.error('Failed to load folders:', error.message); return; }
+  allFolders = data || [];
+}
+
 async function loadLeads() {
   const statusEl = document.getElementById('status');
   const { data, error } = await supabaseClient
     .from('leads')
-    .select('id, address, lat, lon, contractor_code, report_url, created_at')
+    .select('id, address, lat, lon, contractor_code, folder_id, report_url, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -256,6 +372,7 @@ async function loadLeads() {
 
   if (allLeads.length === 0) {
     document.getElementById('emptyState').style.display = 'block';
+    renderFolderBar();
     return;
   }
 
@@ -264,13 +381,14 @@ async function loadLeads() {
   document.getElementById('totalCount').textContent = allLeads.length;
   document.getElementById('assignedCount').textContent = allLeads.filter(l => l.contractor_code).length;
   document.getElementById('unassignedCount').textContent = allLeads.filter(l => !l.contractor_code).length;
+  renderFolderBar();
   renderRows(allLeads);
 
   document.getElementById('searchInput').addEventListener('input', applyFilter);
 }
 
 renderNav('leads');
-loadContractors().then(loadLeads);
+loadContractors().then(() => loadFolders()).then(() => loadLeads());
 </script>
 </body>
 </html>
