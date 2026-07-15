@@ -14,11 +14,12 @@
   header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   header h1 { margin: 0 0 4px; font-size: 1.3rem; }
   header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
-  button, input { font-size: 0.95rem; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #1d262d; color: var(--text); font-family: inherit; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
+  button, input, select { font-size: 0.95rem; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #1d262d; color: var(--text); font-family: inherit; }
   button { background: var(--accent); color: #1a1200; font-weight: 600; border: none; cursor: pointer; }
   button:hover { filter: brightness(1.08); }
   button.secondary { background: #1d262d; color: var(--text); border: 1px solid var(--border); }
+  button.small { font-size: 0.78rem; padding: 6px 10px; }
   .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; }
   .stat .value { font-size: 1.4rem; font-weight: 700; }
@@ -26,14 +27,20 @@
   .filter-row { margin-bottom: 16px; }
   .filter-row input { width: 100%; max-width: 340px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
   tr:last-child td { border-bottom: none; }
-  td.addr { max-width: 320px; }
+  td.addr { max-width: 280px; }
+  td.addr input { width: 100%; }
+  td.qr img { width: 56px; height: 56px; border-radius: 4px; background: #fff; image-rendering: pixelated; display: block; margin-bottom: 4px; }
+  td.qr a { color: var(--accent2); font-size: 0.76rem; text-decoration: none; }
+  td.qr a:hover { text-decoration: underline; }
   a.report-link { color: var(--accent2); text-decoration: none; }
   a.report-link:hover { text-decoration: underline; }
   .contractor-tag { display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 0.8rem; }
   .contractor-tag.unassigned { color: var(--muted); font-style: italic; border-style: dashed; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .edit-status { color: var(--bad); font-size: 0.76rem; margin-top: 4px; }
   #status { color: var(--muted); font-size: 0.9rem; padding: 30px 0; text-align: center; }
   #status.error { color: var(--bad); }
   #emptyState { color: var(--muted); font-size: 0.9rem; padding: 40px 0; text-align: center; display: none; }
@@ -57,13 +64,14 @@
     <h1>Leads Hub</h1>
     <p>Every report link generated so far.</p>
   </div>
-  <div>
-    <a href="qr-generator.html"><button>+ Generate leads</button></a>
+  <div class="row-actions">
+    <a href="index.html"><button class="secondary">+ New lead</button></a>
+    <a href="qr-generator.html"><button>+ Batch generate</button></a>
   </div>
 </header>
 <main>
   <div id="status">Loading leads…</div>
-  <div id="emptyState">No leads yet — head to the <a href="qr-generator.html" style="color:var(--accent2)">QR generator</a> to create some.</div>
+  <div id="emptyState">No leads yet — head to the <a href="index.html" style="color:var(--accent2)">main page</a> to save one, or <a href="qr-generator.html" style="color:var(--accent2)">batch generate</a>.</div>
 
   <div id="summaryWrap" style="display:none;">
     <div class="summary">
@@ -80,10 +88,12 @@
       <table>
         <thead>
           <tr>
+            <th>QR</th>
             <th>Address</th>
             <th>Contractor</th>
             <th>Generated</th>
             <th>Report</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="leadsBody"></tbody>
@@ -94,11 +104,14 @@
 </div>
 
 <script src="gate.js"></script>
+<script src="sun-lib.js"></script>
 <script src="contractors.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-config.js"></script>
 <script>
 let allLeads = [];
+let editingId = null;
 
 function contractorLabel(code) {
   if (!code) return '<span class="contractor-tag unassigned">Unassigned</span>';
@@ -106,37 +119,124 @@ function contractorLabel(code) {
   return `<span class="contractor-tag">${c ? c.name : code}</span>`;
 }
 
+function contractorOptionsHtml(selectedCode) {
+  const options = ['<option value="">Unassigned</option>']
+    .concat(Object.entries(CONTRACTORS).map(([code, c]) =>
+      `<option value="${code}" ${code === selectedCode ? 'selected' : ''}>${c.name}</option>`
+    ));
+  return options.join('');
+}
+
 function fmtDate(iso) {
   return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function renderRows(leads) {
-  const tbody = document.getElementById('leadsBody');
-  tbody.innerHTML = leads.map(lead => `
+function renderRow(lead) {
+  const qrDataUrl = lead.report_url ? makeQrDataUrl(lead.report_url, 4, 16) : null;
+  const qrImgCell = qrDataUrl ? `<img src="${qrDataUrl}" alt="QR code">` : '<span style="color:var(--muted); font-size:0.76rem;">No link yet</span>';
+  const qrDownloadLink = qrDataUrl ? `<a href="${qrDataUrl}" download="qr-${slugify(lead.address)}.gif">Download</a>` : '';
+  const reportCell = lead.report_url
+    ? `<a class="report-link" href="${lead.report_url}" target="_blank">Open report →</a>`
+    : '<span style="color:var(--muted); font-size:0.76rem;">No link yet</span>';
+
+  if (editingId === lead.id) {
+    return `
+      <tr>
+        <td class="qr">${qrImgCell}</td>
+        <td class="addr"><input type="text" id="edit-addr-${lead.id}" value="${lead.address.replace(/"/g, '&quot;')}"></td>
+        <td><select id="edit-contractor-${lead.id}">${contractorOptionsHtml(lead.contractor_code)}</select></td>
+        <td>${fmtDate(lead.created_at)}</td>
+        <td>${reportCell}</td>
+        <td>
+          <div class="row-actions">
+            <button class="small" onclick="saveEdit('${lead.id}')">Save</button>
+            <button class="small secondary" onclick="cancelEdit()">Cancel</button>
+          </div>
+          <div class="edit-status" id="edit-status-${lead.id}"></div>
+        </td>
+      </tr>`;
+  }
+
+  return `
     <tr>
+      <td class="qr">${qrImgCell}${qrDownloadLink}</td>
       <td class="addr">${lead.address}</td>
       <td>${contractorLabel(lead.contractor_code)}</td>
       <td>${fmtDate(lead.created_at)}</td>
-      <td><a class="report-link" href="${lead.report_url}" target="_blank">Open report →</a></td>
-    </tr>
-  `).join('');
+      <td>${reportCell}</td>
+      <td><button class="small secondary" onclick="startEdit('${lead.id}')">Edit</button></td>
+    </tr>`;
 }
 
-function applyFilter() {
+function renderRows(leads) {
+  document.getElementById('leadsBody').innerHTML = leads.map(renderRow).join('');
+}
+
+function currentFilteredLeads() {
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  if (!q) { renderRows(allLeads); return; }
-  const filtered = allLeads.filter(lead => {
+  if (!q) return allLeads;
+  return allLeads.filter(lead => {
     const contractorName = lead.contractor_code && CONTRACTORS[lead.contractor_code] ? CONTRACTORS[lead.contractor_code].name : (lead.contractor_code || '');
     return lead.address.toLowerCase().includes(q) || contractorName.toLowerCase().includes(q);
   });
-  renderRows(filtered);
+}
+
+function applyFilter() {
+  renderRows(currentFilteredLeads());
+}
+
+function startEdit(id) {
+  editingId = id;
+  applyFilter();
+}
+
+function cancelEdit() {
+  editingId = null;
+  applyFilter();
+}
+
+async function saveEdit(id) {
+  const lead = allLeads.find(l => l.id === id);
+  const newAddr = document.getElementById(`edit-addr-${id}`).value.trim();
+  const newContractor = document.getElementById(`edit-contractor-${id}`).value;
+  const statusEl = document.getElementById(`edit-status-${id}`);
+
+  if (!newAddr) { statusEl.textContent = 'Address cannot be empty.'; return; }
+
+  statusEl.textContent = 'Saving…';
+  try {
+    let lat = lead.lat, lon = lead.lon, address = lead.address;
+    if (newAddr !== lead.address) {
+      const loc = await geocode(newAddr);
+      lat = loc.lat;
+      lon = loc.lon;
+      address = loc.display;
+    }
+
+    const { error } = await supabaseClient
+      .from('leads')
+      .update({ address, lat, lon, contractor_code: newContractor || null })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+
+    lead.address = address;
+    lead.lat = lat;
+    lead.lon = lon;
+    lead.contractor_code = newContractor || null;
+    editingId = null;
+    document.getElementById('assignedCount').textContent = allLeads.filter(l => l.contractor_code).length;
+    document.getElementById('unassignedCount').textContent = allLeads.filter(l => !l.contractor_code).length;
+    applyFilter();
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + (err.message || 'failed to save.');
+  }
 }
 
 async function loadLeads() {
   const statusEl = document.getElementById('status');
   const { data, error } = await supabaseClient
     .from('leads')
-    .select('address, lat, lon, contractor_code, report_url, created_at')
+    .select('id, address, lat, lon, contractor_code, report_url, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {

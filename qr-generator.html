@@ -83,26 +83,6 @@ function setStatus(msg, isError) {
   statusEl.className = isError ? 'error' : '';
 }
 
-function reportUrl(lat, lon, addr, contractorCode) {
-  const base = window.location.href.replace(/qr-generator\.html.*$/, 'report.html');
-  const params = new URLSearchParams();
-  params.set('a', `${lat.toFixed(6)},${lon.toFixed(6)}`);
-  params.set('addr', addr);
-  if (contractorCode) params.set('c', contractorCode);
-  return `${base}?${params.toString()}`;
-}
-
-function makeQrDataUrl(text) {
-  const qr = qrcode(0, 'M');
-  qr.addData(text);
-  qr.make();
-  return qr.createDataURL(8, 32);
-}
-
-function slugify(text) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'property';
-}
-
 function renderErrorCard(rawLine, message) {
   const card = document.createElement('div');
   card.className = 'result-card error-card';
@@ -164,18 +144,25 @@ async function generateAll() {
 
     try {
       const loc = await geocode(address);
-      const url = reportUrl(loc.lat, loc.lon, loc.display, contractorCode);
+
+      const { data: inserted, error: insertError } = await supabaseClient
+        .from('leads')
+        .insert({
+          address: loc.display,
+          lat: loc.lat,
+          lon: loc.lon,
+          contractor_code: contractorCode || null,
+        })
+        .select()
+        .single();
+      if (insertError) throw new Error('Failed to save lead: ' + insertError.message);
+
+      const url = reportUrlForId(inserted.id);
+      const { error: urlUpdateError } = await supabaseClient.from('leads').update({ report_url: url }).eq('id', inserted.id);
+      if (urlUpdateError) throw new Error(urlUpdateError.message);
+
       const qrDataUrl = makeQrDataUrl(url);
       renderResultCard(loc.display, contractorCode, url, qrDataUrl);
-
-      const { error: insertError } = await supabaseClient.from('leads').insert({
-        address: loc.display,
-        lat: loc.lat,
-        lon: loc.lon,
-        contractor_code: contractorCode || null,
-        report_url: url,
-      });
-      if (insertError) console.error('Failed to save lead to hub:', insertError.message);
     } catch (err) {
       renderErrorCard(line, err.message || 'Failed to process this line.');
     }

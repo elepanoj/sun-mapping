@@ -110,6 +110,8 @@
 <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
 <script src="sun-lib.js"></script>
 <script src="contractors.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
 <script>
 let reportLoc = null; // { lat, lon }
 
@@ -120,18 +122,20 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
-function getParams() {
-  const params = new URLSearchParams(window.location.search);
-  const a = params.get('a');
-  if (!a) return null;
-  const parts = a.split(',');
-  const lat = parseFloat(parts[0]);
-  const lon = parseFloat(parts[1]);
-  if (!isFinite(lat) || !isFinite(lon)) return null;
+async function loadLead() {
+  const id = new URLSearchParams(window.location.search).get('id');
+  if (!id) return null;
+  const { data, error } = await supabaseClient
+    .from('leads')
+    .select('address, lat, lon, contractor_code')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
   return {
-    lat, lon,
-    addr: params.get('addr') || `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
-    contractorCode: params.get('c') || '',
+    lat: data.lat,
+    lon: data.lon,
+    addr: data.address,
+    contractorCode: data.contractor_code || '',
   };
 }
 
@@ -158,12 +162,12 @@ function updateShadeFrame() {
 }
 
 async function run() {
-  const params = getParams();
-  if (!params) {
-    showError('This report link looks incomplete. Please rescan the QR code, or contact us directly.');
+  const lead = await loadLead();
+  if (!lead) {
+    showError('This report link looks incomplete or the report was not found. Please rescan the QR code, or contact us directly.');
     return;
   }
-  const { lat, lon, addr, contractorCode } = params;
+  const { lat, lon, addr, contractorCode } = lead;
   reportLoc = { lat, lon };
 
   renderContractor(contractorCode);

@@ -234,3 +234,20 @@ function shadeMapUrl(lat, lon, dateAtMinutes) {
   const ts = dateAtMinutes.getTime();
   return `https://shademap.app/@${lat},${lon},19z,${ts}t,0b,55p,0m`;
 }
+
+function reportUrlForId(id) {
+  const base = window.location.href.replace(/[^/]*$/, '');
+  return `${base}report.html?id=${id}`;
+}
+
+// Requires vendor/qrcode.js to be loaded first.
+function makeQrDataUrl(text, cellSize, margin) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(cellSize || 8, margin);
+}
+
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'property';
+}
