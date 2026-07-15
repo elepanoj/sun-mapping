@@ -51,6 +51,7 @@
 <header>
   <h1>Batch QR Generator</h1>
   <p>Paste one property per line to generate a report link + QR code for each.</p>
+  <p style="margin-top:8px;"><a href="hub.html" style="color:var(--accent2)">View all generated leads →</a></p>
 </header>
 <main>
   <textarea id="inputArea" placeholder="2424 Courthouse Drive, Virginia Beach, VA | example-co&#10;123 Main St, Virginia Beach, VA | example-co"></textarea>
@@ -69,6 +70,8 @@
 <script src="sun-lib.js"></script>
 <script src="contractors.js"></script>
 <script src="vendor/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
 <script>
 const statusEl = $('status');
 const grid = $('resultsGrid');
@@ -164,6 +167,15 @@ async function generateAll() {
       const url = reportUrl(loc.lat, loc.lon, loc.display, contractorCode);
       const qrDataUrl = makeQrDataUrl(url);
       renderResultCard(loc.display, contractorCode, url, qrDataUrl);
+
+      const { error: insertError } = await supabaseClient.from('leads').insert({
+        address: loc.display,
+        lat: loc.lat,
+        lon: loc.lon,
+        contractor_code: contractorCode || null,
+        report_url: url,
+      });
+      if (insertError) console.error('Failed to save lead to hub:', insertError.message);
     } catch (err) {
       renderErrorCard(line, err.message || 'Failed to process this line.');
     }

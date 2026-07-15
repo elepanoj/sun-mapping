@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leads Hub — Sunset Horizons</title>
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --border: #2a333b; --text: #e7edf2;
+    --muted: #93a3af; --accent: #f2a900; --accent2: #4fa3e0; --good: #4caf7d; --bad: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
+  button, input { font-size: 0.95rem; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #1d262d; color: var(--text); font-family: inherit; }
+  button { background: var(--accent); color: #1a1200; font-weight: 600; border: none; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  button.secondary { background: #1d262d; color: var(--text); border: 1px solid var(--border); }
+  .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; }
+  .stat .value { font-size: 1.4rem; font-weight: 700; }
+  .stat .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+  .filter-row { margin-bottom: 16px; }
+  .filter-row input { width: 100%; max-width: 340px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.addr { max-width: 320px; }
+  a.report-link { color: var(--accent2); text-decoration: none; }
+  a.report-link:hover { text-decoration: underline; }
+  .contractor-tag { display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 0.8rem; }
+  .contractor-tag.unassigned { color: var(--muted); font-style: italic; border-style: dashed; }
+  #status { color: var(--muted); font-size: 0.9rem; padding: 30px 0; text-align: center; }
+  #status.error { color: var(--bad); }
+  #emptyState { color: var(--muted); font-size: 0.9rem; padding: 40px 0; text-align: center; display: none; }
+  #tableWrap { display: none; overflow-x: auto; }
+</style>
+<link rel="stylesheet" href="gate.css">
+</head>
+<body>
+<div id="gate">
+  <div class="gate-card">
+    <h2>Sunset Horizons</h2>
+    <p>Enter the passphrase to continue.</p>
+    <input type="password" id="gatePassphrase" placeholder="Passphrase" autocomplete="off">
+    <button id="gateSubmit">Unlock</button>
+    <div id="gateError"></div>
+  </div>
+</div>
+<div id="appContent">
+<header>
+  <div>
+    <h1>Leads Hub</h1>
+    <p>Every report link generated so far.</p>
+  </div>
+  <div>
+    <a href="qr-generator.html"><button>+ Generate leads</button></a>
+  </div>
+</header>
+<main>
+  <div id="status">Loading leads…</div>
+  <div id="emptyState">No leads yet — head to the <a href="qr-generator.html" style="color:var(--accent2)">QR generator</a> to create some.</div>
+
+  <div id="summaryWrap" style="display:none;">
+    <div class="summary">
+      <div class="stat"><div class="value" id="totalCount">0</div><div class="label">Total leads</div></div>
+      <div class="stat"><div class="value" id="assignedCount">0</div><div class="label">Assigned to a contractor</div></div>
+      <div class="stat"><div class="value" id="unassignedCount">0</div><div class="label">Unassigned</div></div>
+    </div>
+
+    <div class="filter-row">
+      <input type="text" id="searchInput" placeholder="Search by address or contractor…">
+    </div>
+
+    <div id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Address</th>
+            <th>Contractor</th>
+            <th>Generated</th>
+            <th>Report</th>
+          </tr>
+        </thead>
+        <tbody id="leadsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="gate.js"></script>
+<script src="contractors.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script>
+let allLeads = [];
+
+function contractorLabel(code) {
+  if (!code) return '<span class="contractor-tag unassigned">Unassigned</span>';
+  const c = CONTRACTORS[code];
+  return `<span class="contractor-tag">${c ? c.name : code}</span>`;
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function renderRows(leads) {
+  const tbody = document.getElementById('leadsBody');
+  tbody.innerHTML = leads.map(lead => `
+    <tr>
+      <td class="addr">${lead.address}</td>
+      <td>${contractorLabel(lead.contractor_code)}</td>
+      <td>${fmtDate(lead.created_at)}</td>
+      <td><a class="report-link" href="${lead.report_url}" target="_blank">Open report →</a></td>
+    </tr>
+  `).join('');
+}
+
+function applyFilter() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  if (!q) { renderRows(allLeads); return; }
+  const filtered = allLeads.filter(lead => {
+    const contractorName = lead.contractor_code && CONTRACTORS[lead.contractor_code] ? CONTRACTORS[lead.contractor_code].name : (lead.contractor_code || '');
+    return lead.address.toLowerCase().includes(q) || contractorName.toLowerCase().includes(q);
+  });
+  renderRows(filtered);
+}
+
+async function loadLeads() {
+  const statusEl = document.getElementById('status');
+  const { data, error } = await supabaseClient
+    .from('leads')
+    .select('address, lat, lon, contractor_code, report_url, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    statusEl.textContent = 'Could not load leads: ' + error.message;
+    statusEl.className = 'error';
+    return;
+  }
+
+  statusEl.style.display = 'none';
+  allLeads = data || [];
+
+  if (allLeads.length === 0) {
+    document.getElementById('emptyState').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('summaryWrap').style.display = 'block';
+  document.getElementById('tableWrap').style.display = 'block';
+  document.getElementById('totalCount').textContent = allLeads.length;
+  document.getElementById('assignedCount').textContent = allLeads.filter(l => l.contractor_code).length;
+  document.getElementById('unassignedCount').textContent = allLeads.filter(l => !l.contractor_code).length;
+  renderRows(allLeads);
+
+  document.getElementById('searchInput').addEventListener('input', applyFilter);
+}
+
+loadLeads();
+</script>
+</body>
+</html>
