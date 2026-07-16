@@ -20,13 +20,19 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const STEP1_PROMPT = `You are given 4 photographs captured from Google Earth's 3D fly-around view of a residential backyard, each showing the same property from a different oblique, rotated angle. These images contain two kinds of non-physical artifacts you must disregard entirely: (1) photogrammetry mesh artifacts — warped, melting, or jagged geometry near rooflines and image borders, which are capture/reconstruction artifacts, not real structure; and (2) an on-screen UI location pin or text label baked into the image, which is an interface overlay, not part of the scene.
+const STEP1_PROMPT = `Generate a photorealistic, eye-level, wide-angle photograph capturing the backyard depicted in the provided reference images.
 
-Use all 4 images together to triangulate the true 3D layout of the yard: pool shape and position, patio material and extent, house wall orientation and rear elevation, fence lines, and landscaping. From that understanding, generate ONE new photorealistic, eye-level, wide-angle ground-level photograph of this backyard — the kind of shot a real-estate photographer would take standing at the back of the yard looking toward the house.
+Instructions for Scene Construction:
 
-Choose the vantage point that gives the fullest, most flattering view of the yard in a single frame — typically from the far end of the pool or patio area looking back toward the house — so that the pool, surrounding patio/hardscape, patio furniture, the house's full rear elevation, fencing, and landscaping are all visible and coherently arranged in one shot.
+Analyze the House: Carefully examine the rear elevation, architecture, siding color, roof style, and window placement of the house shown in the reference photos. Reconstruct this exact house structure and its features as the primary background element.
 
-Render in natural daylight under a clear sky. The output must read as an actual photograph: no visible seams, warping, stylization, or leftover reconstruction artifacts from the source images.`;
+Analyze Features: Identify all permanent structures within the yard, including but not limited to the swimming pool, its specific shape, its cover (or lack thereof), decking material, patio furniture, and any outbuildings (sheds, gazebos). Replicate their exact positions and appearances relative to the house and fences.
+
+Analyze Environment: Note the landscaping, mature trees, bushes, and fencing visible in the reference photos. Recreate the perimeter boundary and vegetation density to match the input.
+
+Lighting and Composition: Use bright, natural daylight consistent with the photos. The camera angle should be from the far corner of the yard, looking toward the back of the house, to encompass the entire scene.
+
+Constraint: Do not alter, add, or remove any major structures, furniture, or landscaping features. The goal is a perfect visual match of the provided location from a new perspective.`;
 
 const STEP2_PROMPT = `You are given a single photorealistic ground-level photograph of a backyard showing a pool, patio, and the rear of a house.
 
