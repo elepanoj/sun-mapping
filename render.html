@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backyard Render — Sunset Horizons</title>
+<style>
+  :root {
+    --bg: #0f1418; --panel: #171e24; --border: #2a333b; --text: #e7edf2;
+    --muted: #93a3af; --accent: #f2a900; --accent2: #4fa3e0; --good: #4caf7d; --bad: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  main { max-width: 800px; margin: 0 auto; padding: 20px 24px 60px; }
+  button { font-size: 0.95rem; padding: 10px 16px; border-radius: 8px; border: none; background: var(--accent); color: #1a1200; font-weight: 600; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  button:disabled { opacity: 0.5; cursor: default; filter: none; }
+  button.secondary { background: #1d262d; color: var(--text); border: 1px solid var(--border); }
+  section.block { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  section.block h2 { margin: 0 0 6px; font-size: 1.05rem; }
+  section.block .hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; }
+  .upload-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+  .upload-slot-inner {
+    aspect-ratio: 4 / 3; border: 2px dashed var(--border); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    overflow: hidden; position: relative; background: #10151a;
+  }
+  .upload-slot-inner:hover { border-color: var(--accent2); }
+  .upload-placeholder { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 10px; }
+  .upload-preview { width: 100%; height: 100%; object-fit: cover; display: none; }
+  .row-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .status-msg { color: var(--muted); font-size: 0.85rem; margin-top: 10px; min-height: 1.2em; }
+  .status-msg.error { color: var(--bad); }
+  .result-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<link rel="stylesheet" href="gate.css">
+<link rel="stylesheet" href="nav.css">
+</head>
+<body>
+<div id="gate">
+  <div class="gate-card">
+    <h2>Sunset Horizons</h2>
+    <p>Enter the passphrase to continue.</p>
+    <input type="password" id="gatePassphrase" placeholder="Passphrase" autocomplete="off">
+    <button id="gateSubmit">Unlock</button>
+    <div id="gateError"></div>
+  </div>
+</div>
+<div id="appContent">
+<nav id="mainNav" class="main-nav"></nav>
+<header>
+  <h1>Backyard Render</h1>
+  <p>Turn 4 Google Earth 3D aerial captures into a ground-level photo, then add a pergola.</p>
+</header>
+<main>
+  <section class="block">
+    <h2>1. Upload 4 aerial reference images</h2>
+    <p class="hint">Google Earth 3D fly-around captures, each from a different angle around the property — the more overlap between angles, the better the result.</p>
+    <div class="upload-grid" id="uploadGrid">
+      <div class="upload-slot" data-slot="0">
+        <div class="upload-slot-inner">
+          <span class="upload-placeholder">Angle 1<br>Click to choose</span>
+          <img class="upload-preview">
+        </div>
+        <input type="file" accept="image/*" id="slot-0" style="display:none;">
+      </div>
+      <div class="upload-slot" data-slot="1">
+        <div class="upload-slot-inner">
+          <span class="upload-placeholder">Angle 2<br>Click to choose</span>
+          <img class="upload-preview">
+        </div>
+        <input type="file" accept="image/*" id="slot-1" style="display:none;">
+      </div>
+      <div class="upload-slot" data-slot="2">
+        <div class="upload-slot-inner">
+          <span class="upload-placeholder">Angle 3<br>Click to choose</span>
+          <img class="upload-preview">
+        </div>
+        <input type="file" accept="image/*" id="slot-2" style="display:none;">
+      </div>
+      <div class="upload-slot" data-slot="3">
+        <div class="upload-slot-inner">
+          <span class="upload-placeholder">Angle 4<br>Click to choose</span>
+          <img class="upload-preview">
+        </div>
+        <input type="file" accept="image/*" id="slot-3" style="display:none;">
+      </div>
+    </div>
+    <button id="generateStep1Btn" disabled>Generate Ground-Level Photo</button>
+    <div class="status-msg" id="step1Status"></div>
+  </section>
+
+  <section class="block" id="step1ResultSection" style="display:none;">
+    <h2>2. Ground-level result</h2>
+    <p class="hint">Review this before adding the pergola — it's the base the next step builds on.</p>
+    <img class="result-img" id="step1ResultImg" alt="Generated ground-level backyard photo">
+    <div class="row-actions">
+      <button class="secondary" id="downloadStep1Btn">Download</button>
+      <button id="addPergolaBtn">Add Pergola →</button>
+    </div>
+    <div class="status-msg" id="step2Status"></div>
+  </section>
+
+  <section class="block" id="step2ResultSection" style="display:none;">
+    <h2>3. Final render (with pergola)</h2>
+    <img class="result-img" id="step2ResultImg" alt="Final backyard render with pergola added">
+    <div class="row-actions">
+      <button class="secondary" id="downloadStep2Btn">Download</button>
+      <button class="secondary" id="newJobBtn">Start New Job</button>
+    </div>
+  </section>
+</main>
+</div>
+
+<script src="gate.js"></script>
+<script src="nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script>
+renderNav('render');
+
+const RENDER_BUCKET = 'render-jobs';
+const GENERATE_RENDER_URL = `${SUPABASE_URL}/functions/v1/generate-render`;
+
+let currentJobId = null;
+let selectedFiles = [null, null, null, null];
+let step1OutputPath = null;
+
+function updateGenerateButton() {
+  document.getElementById('generateStep1Btn').disabled = selectedFiles.some(f => !f);
+}
+
+function setupSlot(i) {
+  const input = document.getElementById(`slot-${i}`);
+  const slot = document.querySelector(`.upload-slot[data-slot="${i}"]`);
+  const inner = slot.querySelector('.upload-slot-inner');
+  const placeholder = slot.querySelector('.upload-placeholder');
+  const preview = slot.querySelector('.upload-preview');
+
+  inner.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    selectedFiles[i] = file;
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    updateGenerateButton();
+  });
+}
+[0, 1, 2, 3].forEach(setupSlot);
+
+async function uploadImage(jobId, file, name) {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${jobId}/${name}.${ext}`;
+  const { error } = await supabaseClient.storage.from(RENDER_BUCKET).upload(path, file);
+  if (error) throw new Error(`Failed to upload ${name}: ${error.message}`);
+  return path;
+}
+
+async function callGenerateRender(step, jobId, imagePaths) {
+  const res = await fetch(GENERATE_RENDER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ step, jobId, imagePaths }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
+}
+
+async function generateStep1() {
+  const btn = document.getElementById('generateStep1Btn');
+  const statusEl = document.getElementById('step1Status');
+  btn.disabled = true;
+  statusEl.className = 'status-msg';
+  statusEl.innerHTML = '<span class="spinner"></span>Uploading images…';
+  try {
+    currentJobId = crypto.randomUUID();
+    const paths = [];
+    for (let i = 0; i < 4; i++) {
+      paths.push(await uploadImage(currentJobId, selectedFiles[i], `input-${i + 1}`));
+    }
+    statusEl.innerHTML = '<span class="spinner"></span>Generating ground-level photo… this can take up to a minute.';
+    const { outputPath, outputUrl } = await callGenerateRender(1, currentJobId, paths);
+    step1OutputPath = outputPath;
+    document.getElementById('step1ResultImg').src = outputUrl;
+    document.getElementById('step1ResultSection').style.display = 'block';
+    document.getElementById('step1ResultSection').scrollIntoView({ behavior: 'smooth' });
+    statusEl.textContent = '';
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    statusEl.className = 'status-msg error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function addPergola() {
+  const btn = document.getElementById('addPergolaBtn');
+  const statusEl = document.getElementById('step2Status');
+  btn.disabled = true;
+  statusEl.className = 'status-msg';
+  statusEl.innerHTML = '<span class="spinner"></span>Adding pergola… this can take up to a minute.';
+  try {
+    const { outputUrl } = await callGenerateRender(2, currentJobId, [step1OutputPath]);
+    document.getElementById('step2ResultImg').src = outputUrl;
+    document.getElementById('step2ResultSection').style.display = 'block';
+    document.getElementById('step2ResultSection').scrollIntoView({ behavior: 'smooth' });
+    statusEl.textContent = '';
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    statusEl.className = 'status-msg error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function downloadImage(url, filename) {
+  fetch(url).then(r => r.blob()).then(blob => {
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+  });
+}
+
+document.getElementById('generateStep1Btn').addEventListener('click', generateStep1);
+document.getElementById('addPergolaBtn').addEventListener('click', addPergola);
+document.getElementById('downloadStep1Btn').addEventListener('click', () =>
+  downloadImage(document.getElementById('step1ResultImg').src, 'backyard-ground-level.png'));
+document.getElementById('downloadStep2Btn').addEventListener('click', () =>
+  downloadImage(document.getElementById('step2ResultImg').src, 'backyard-with-pergola.png'));
+document.getElementById('newJobBtn').addEventListener('click', () => location.reload());
+</script>
+</body>
+</html>
