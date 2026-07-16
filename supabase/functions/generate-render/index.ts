@@ -8,9 +8,10 @@
 // Response: { outputPath: string, outputUrl: string }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { encodeBase64, decodeBase64 } from 'jsr:@std/encoding@1/base64';
 
 const BUCKET = 'render-jobs';
-const GEMINI_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_MODEL = 'gemini-3-pro-image-preview';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const CORS_HEADERS = {
@@ -80,9 +81,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase.storage.from(BUCKET).download(path);
       if (error || !data) return errorResponse(`Could not read ${path}: ${error?.message || 'not found'}`, 404);
       const bytes = new Uint8Array(await data.arrayBuffer());
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
+      const base64 = encodeBase64(bytes);
       const mimeType = data.type || 'image/jpeg';
       imageParts.push({ inline_data: { mime_type: mimeType, data: base64 } });
     }
@@ -90,7 +89,10 @@ Deno.serve(async (req) => {
     const prompt = step === 1 ? STEP1_PROMPT : STEP2_PROMPT;
     const geminiBody = {
       contents: [{ parts: [...imageParts, { text: prompt }] }],
-      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      generationConfig: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: { aspectRatio: '16:9', imageSize: '4K' },
+      },
     };
 
     const geminiRes = await fetch(`${GEMINI_URL}?key=${geminiApiKey}`, {
@@ -121,7 +123,7 @@ Deno.serve(async (req) => {
     const outMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
     const outExt = extForMimeType(outMimeType);
     const outputPath = `${jobId}/step${step}-output.${outExt}`;
-    const outputBytes = Uint8Array.from(atob(inlineData.data), (c) => c.charCodeAt(0));
+    const outputBytes = decodeBase64(inlineData.data);
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
@@ -134,6 +136,7 @@ Deno.serve(async (req) => {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
   } catch (err) {
+    console.error('generate-render failed:', err);
     return errorResponse(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`, 500);
   }
 });
