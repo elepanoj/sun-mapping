@@ -41,6 +41,7 @@
   .contractor-tag { display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 0.8rem; }
   .contractor-tag.unassigned { color: var(--muted); font-style: italic; border-style: dashed; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .files-btn.has-files { background: var(--accent); color: #1a1200; border-color: var(--accent); font-weight: 700; }
   .edit-status { color: var(--bad); font-size: 0.76rem; margin-top: 4px; }
   #status { color: var(--muted); font-size: 0.9rem; padding: 30px 0; text-align: center; }
   #status.error { color: var(--bad); }
@@ -262,6 +263,8 @@ function renderRow(lead) {
   const reportCell = lead.report_url
     ? `<a class="report-link" href="${lead.report_url}" target="_blank">Open report →</a>`
     : '<span style="color:var(--muted); font-size:0.76rem;">No link yet</span>';
+  const filesLabel = lead.fileCount > 0 ? `Files (${lead.fileCount})` : (typeof lead.fileCount === 'number' ? 'Files' : 'Files…');
+  const filesClass = lead.fileCount > 0 ? 'small secondary files-btn has-files' : 'small secondary files-btn';
 
   if (editingId === lead.id) {
     return `
@@ -271,7 +274,7 @@ function renderRow(lead) {
         <td><select id="edit-contractor-${lead.id}">${contractorOptionsHtml(lead.contractor_code)}</select></td>
         <td>${fmtDate(lead.created_at)}</td>
         <td>${reportCell}</td>
-        <td><a href="lead-files.html?id=${lead.id}"><button class="small secondary" type="button">Files</button></a></td>
+        <td><a href="lead-files.html?id=${lead.id}"><button class="${filesClass}" type="button" id="files-btn-${lead.id}">${filesLabel}</button></a></td>
         <td>
           <div class="row-actions">
             <button class="small" onclick="saveEdit('${lead.id}')">Save</button>
@@ -289,7 +292,7 @@ function renderRow(lead) {
       <td>${contractorLabel(lead.contractor_code)}</td>
       <td>${fmtDate(lead.created_at)}</td>
       <td>${reportCell}</td>
-      <td><a href="lead-files.html?id=${lead.id}"><button class="small secondary" type="button">Files</button></a></td>
+      <td><a href="lead-files.html?id=${lead.id}"><button class="${filesClass}" type="button" id="files-btn-${lead.id}">${filesLabel}</button></a></td>
       <td>
         <div class="row-actions">
           <button class="small secondary" onclick="startEdit('${lead.id}')">Edit</button>
@@ -433,6 +436,15 @@ async function loadLeads() {
   renderRows(allLeads);
 
   document.getElementById('searchInput').addEventListener('input', applyFilter);
+  loadFileCounts();
+}
+
+async function loadFileCounts() {
+  await Promise.all(allLeads.map(async (lead) => {
+    const { data } = await supabaseClient.storage.from('lead-files').list(lead.id);
+    lead.fileCount = (data || []).filter(f => f.id).length;
+  }));
+  applyFilter();
 }
 
 renderNav('leads');
