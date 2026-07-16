@@ -4,7 +4,6 @@ const NAV_ITEMS = [
   { key: 'leads', href: 'hub.html', label: 'Leads' },
   { key: 'contractors', href: 'contractors.html', label: 'Contractors' },
   { key: 'batch', href: 'qr-generator.html', label: 'Batch Generate' },
-  { key: 'render', href: 'render.html', label: 'Render' },
 ];
 
 function renderNav(active) {

@@ -131,11 +131,22 @@ async function loadLead() {
     .single();
   if (error || !data) return null;
   return {
+    id,
     lat: data.lat,
     lon: data.lon,
     addr: data.address,
     contractorCode: data.contractor_code || '',
   };
+}
+
+// Records a scan, unless this load came from the internal "Open report" link
+// in the hub (which appends ?preview=1) — keeps staff previews out of the
+// customer-facing scan analytics. Fire-and-forget: never blocks or fails
+// visibly for the homeowner viewing the report.
+function trackScan(leadId) {
+  if (new URLSearchParams(window.location.search).get('preview') === '1') return;
+  supabaseClient.from('lead_scans').insert({ lead_id: leadId, user_agent: navigator.userAgent })
+    .then(({ error }) => { if (error) console.error('Failed to record scan:', error.message); });
 }
 
 async function renderContractor(code) {
@@ -172,6 +183,7 @@ async function run() {
   }
   const { lat, lon, addr, contractorCode } = lead;
   reportLoc = { lat, lon };
+  trackScan(lead.id);
 
   await renderContractor(contractorCode);
   $('addrHeading').textContent = addr;

@@ -42,6 +42,11 @@
   .contractor-tag.unassigned { color: var(--muted); font-style: italic; border-style: dashed; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .files-btn.has-files { background: var(--accent); color: #1a1200; border-color: var(--accent); font-weight: 700; }
+  .scan-status { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .scan-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); opacity: 0.5; flex-shrink: 0; }
+  .scan-dot.scanned { background: var(--good); opacity: 1; box-shadow: 0 0 0 3px rgba(76, 175, 125, 0.2); }
+  .analytics-link { display: inline-block; color: var(--accent2); font-size: 0.76rem; text-decoration: none; }
+  .analytics-link:hover { text-decoration: underline; }
   .edit-status { color: var(--bad); font-size: 0.76rem; margin-top: 4px; }
   #status { color: var(--muted); font-size: 0.9rem; padding: 30px 0; text-align: center; }
   #status.error { color: var(--bad); }
@@ -95,6 +100,8 @@
       <div class="stat"><div class="value" id="totalCount">0</div><div class="label">Total leads</div></div>
       <div class="stat"><div class="value" id="assignedCount">0</div><div class="label">Assigned to a contractor</div></div>
       <div class="stat"><div class="value" id="unassignedCount">0</div><div class="label">Unassigned</div></div>
+      <div class="stat"><div class="value" id="totalScans">0</div><div class="label">Total QR scans</div></div>
+      <div class="stat"><div class="value" id="leadsScannedCount">0</div><div class="label">Leads scanned</div></div>
     </div>
 
     <div class="folder-bar" id="folderBar"></div>
@@ -113,6 +120,7 @@
             <th>Contractor</th>
             <th>Generated</th>
             <th>Report</th>
+            <th>Scans</th>
             <th>Files</th>
             <th></th>
           </tr>
@@ -261,10 +269,21 @@ function renderRow(lead) {
   const qrImgCell = qrDataUrl ? `<img src="${qrDataUrl}" alt="QR code">` : '<span style="color:var(--muted); font-size:0.76rem;">No link yet</span>';
   const qrDownloadLink = qrDataUrl ? `<a href="${qrDataUrl}" download="qr-${slugify(lead.address)}.gif">Download</a>` : '';
   const reportCell = lead.report_url
-    ? `<a class="report-link" href="${lead.report_url}" target="_blank">Open report →</a>`
+    ? `<a class="report-link" href="${lead.report_url}&preview=1" target="_blank">Open report →</a>`
     : '<span style="color:var(--muted); font-size:0.76rem;">No link yet</span>';
   const filesLabel = lead.fileCount > 0 ? `Files (${lead.fileCount})` : (typeof lead.fileCount === 'number' ? 'Files' : 'Files…');
   const filesClass = lead.fileCount > 0 ? 'small secondary files-btn has-files' : 'small secondary files-btn';
+  const scanned = typeof lead.scanCount === 'number' && lead.scanCount > 0;
+  const scansCell = typeof lead.scanCount !== 'number'
+    ? '<span style="color:var(--muted); font-size:0.76rem;">…</span>'
+    : `
+      <div class="scan-status">
+        <span class="scan-dot ${scanned ? 'scanned' : ''}" title="${scanned ? 'Customer has scanned this QR code' : 'Not scanned yet'}"></span>
+        <span style="${scanned ? 'color:var(--good); font-weight:700;' : 'color:var(--muted); font-size:0.76rem;'}" ${scanned ? `title="Last scanned ${fmtDate(lead.lastScanAt)}"` : ''}>
+          ${scanned ? `${lead.scanCount} scan${lead.scanCount === 1 ? '' : 's'}` : 'No scans yet'}
+        </span>
+      </div>
+      <a class="analytics-link" href="lead-analytics.html?id=${lead.id}">Full analytics →</a>`;
 
   if (editingId === lead.id) {
     return `
@@ -274,6 +293,7 @@ function renderRow(lead) {
         <td><select id="edit-contractor-${lead.id}">${contractorOptionsHtml(lead.contractor_code)}</select></td>
         <td>${fmtDate(lead.created_at)}</td>
         <td>${reportCell}</td>
+        <td>${scansCell}</td>
         <td><a href="lead-files.html?id=${lead.id}"><button class="${filesClass}" type="button" id="files-btn-${lead.id}">${filesLabel}</button></a></td>
         <td>
           <div class="row-actions">
@@ -292,6 +312,7 @@ function renderRow(lead) {
       <td>${contractorLabel(lead.contractor_code)}</td>
       <td>${fmtDate(lead.created_at)}</td>
       <td>${reportCell}</td>
+      <td>${scansCell}</td>
       <td><a href="lead-files.html?id=${lead.id}"><button class="${filesClass}" type="button" id="files-btn-${lead.id}">${filesLabel}</button></a></td>
       <td>
         <div class="row-actions">
@@ -437,6 +458,7 @@ async function loadLeads() {
 
   document.getElementById('searchInput').addEventListener('input', applyFilter);
   loadFileCounts();
+  loadScanCounts();
 }
 
 async function loadFileCounts() {
@@ -444,6 +466,29 @@ async function loadFileCounts() {
     const { data } = await supabaseClient.storage.from('lead-files').list(lead.id);
     lead.fileCount = (data || []).filter(f => f.id).length;
   }));
+  applyFilter();
+}
+
+async function loadScanCounts() {
+  const { data, error } = await supabaseClient.from('lead_scans').select('lead_id, scanned_at');
+  if (error) { console.error('Failed to load scan data:', error.message); return; }
+
+  const counts = {};
+  const lastScan = {};
+  (data || []).forEach(row => {
+    counts[row.lead_id] = (counts[row.lead_id] || 0) + 1;
+    if (!lastScan[row.lead_id] || row.scanned_at > lastScan[row.lead_id]) {
+      lastScan[row.lead_id] = row.scanned_at;
+    }
+  });
+
+  allLeads.forEach(lead => {
+    lead.scanCount = counts[lead.id] || 0;
+    lead.lastScanAt = lastScan[lead.id] || null;
+  });
+
+  document.getElementById('totalScans').textContent = data ? data.length : 0;
+  document.getElementById('leadsScannedCount').textContent = Object.keys(counts).length;
   applyFilter();
 }
 
