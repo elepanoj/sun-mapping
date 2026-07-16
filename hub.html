@@ -19,6 +19,7 @@
   button { background: var(--accent); color: #1a1200; font-weight: 600; border: none; cursor: pointer; }
   button:hover { filter: brightness(1.08); }
   button.secondary { background: #1d262d; color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--bad); color: #fff; }
   button.small { font-size: 0.78rem; padding: 6px 10px; }
   .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; }
@@ -276,7 +277,12 @@ function renderRow(lead) {
       <td>${fmtDate(lead.created_at)}</td>
       <td>${reportCell}</td>
       <td><a href="lead-files.html?id=${lead.id}"><button class="small secondary" type="button">Files</button></a></td>
-      <td><button class="small secondary" onclick="startEdit('${lead.id}')">Edit</button></td>
+      <td>
+        <div class="row-actions">
+          <button class="small secondary" onclick="startEdit('${lead.id}')">Edit</button>
+          <button class="small danger" onclick="deleteLead('${lead.id}')">Delete</button>
+        </div>
+      </td>
     </tr>`;
 }
 
@@ -345,6 +351,34 @@ async function saveEdit(id) {
     applyFilter();
   } catch (err) {
     statusEl.textContent = 'Error: ' + (err.message || 'failed to save.');
+  }
+}
+
+async function deleteLead(id) {
+  const lead = allLeads.find(l => l.id === id);
+  if (!lead) return;
+  if (!confirm(`Delete lead "${lead.address}"? This also removes any files uploaded for it. This can't be undone.`)) return;
+
+  const { data: files } = await supabaseClient.storage.from('lead-files').list(id);
+  if (files && files.length) {
+    await supabaseClient.storage.from('lead-files').remove(files.map(f => `${id}/${f.name}`));
+  }
+
+  const { data: deleted, error } = await supabaseClient.from('leads').delete().eq('id', id).select();
+  if (error) { alert('Error deleting lead: ' + error.message); return; }
+  if (!deleted || deleted.length === 0) { alert('Delete did not go through — no row was removed.'); return; }
+
+  allLeads = allLeads.filter(l => l.id !== id);
+  document.getElementById('totalCount').textContent = allLeads.length;
+  document.getElementById('assignedCount').textContent = allLeads.filter(l => l.contractor_code).length;
+  document.getElementById('unassignedCount').textContent = allLeads.filter(l => !l.contractor_code).length;
+  renderFolderBar();
+
+  if (allLeads.length === 0) {
+    document.getElementById('summaryWrap').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+  } else {
+    applyFilter();
   }
 }
 
