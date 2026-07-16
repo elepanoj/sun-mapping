@@ -61,6 +61,7 @@
 </style>
 <link rel="stylesheet" href="gate.css">
 <link rel="stylesheet" href="nav.css">
+<link rel="stylesheet" href="autocomplete.css">
 </head>
 <body>
 <div id="gate">
@@ -191,6 +192,7 @@ function populateContractorSelect() {
 }
 
 renderNav('new');
+attachAddressAutocomplete('address');
 loadContractors().then(populateContractorSelect);
 
 async function saveLead() {

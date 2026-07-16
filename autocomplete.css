@@ -1,0 +1,19 @@
+.address-autocomplete-dropdown {
+  position: fixed;
+  z-index: 200;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.address-autocomplete-item {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.address-autocomplete-item:last-child { border-bottom: none; }
+.address-autocomplete-item:hover { background: var(--border); }

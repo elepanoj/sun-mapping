@@ -235,6 +235,74 @@ function shadeMapUrl(lat, lon, dateAtMinutes) {
   return `https://shademap.app/@${lat},${lon},19z,${ts}t,0b,55p,0m`;
 }
 
+// Attaches a live address-suggestion dropdown to a text input. Debounced,
+// queries Nominatim as the user types, and fills the input on selection.
+function attachAddressAutocomplete(inputId, onSelect) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  const existing = document.querySelector(`.address-autocomplete-dropdown[data-for="${inputId}"]`);
+  if (existing) existing.remove();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'address-autocomplete-dropdown';
+  dropdown.dataset.for = inputId;
+  document.body.appendChild(dropdown);
+
+  let debounceTimer = null;
+  let currentResults = [];
+
+  function hideDropdown() {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+
+  function positionDropdown() {
+    const rect = input.getBoundingClientRect();
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.top = rect.bottom + 'px';
+    dropdown.style.width = rect.width + 'px';
+  }
+
+  async function fetchSuggestions(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`;
+    try {
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const query = input.value.trim();
+    if (query.length < 4) { hideDropdown(); return; }
+    debounceTimer = setTimeout(async () => {
+      const results = await fetchSuggestions(query);
+      currentResults = results;
+      if (!results.length) { hideDropdown(); return; }
+      dropdown.innerHTML = results.map((r, i) =>
+        `<div class="address-autocomplete-item" data-idx="${i}">${r.display_name}</div>`
+      ).join('');
+      positionDropdown();
+      dropdown.style.display = 'block';
+      Array.from(dropdown.children).forEach((el, i) => {
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          input.value = currentResults[i].display_name;
+          hideDropdown();
+          if (onSelect) onSelect(currentResults[i]);
+        });
+      });
+    }, 450);
+  });
+
+  input.addEventListener('blur', () => setTimeout(hideDropdown, 150));
+  window.addEventListener('resize', () => { if (dropdown.style.display === 'block') positionDropdown(); });
+}
+
 function reportUrlForId(id) {
   const base = window.location.href.replace(/[^/]*$/, '');
   return `${base}report.html?id=${id}`;

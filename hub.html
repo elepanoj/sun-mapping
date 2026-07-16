@@ -61,6 +61,7 @@
 </style>
 <link rel="stylesheet" href="gate.css">
 <link rel="stylesheet" href="nav.css">
+<link rel="stylesheet" href="autocomplete.css">
 </head>
 <body>
 <div id="gate">
@@ -162,7 +163,7 @@ function renderFolderBar() {
   pills.push(`
     <div class="new-folder-form">
       <input type="text" id="newFolderName" placeholder="New folder name…" onkeydown="if(event.key==='Enter') createFolder()">
-      <button class="small secondary" type="button" onclick="createFolder()">+ Add</button>
+      <button class="small secondary" type="button" id="addFolderBtn" onclick="createFolder()">+ Add</button>
     </div>`);
 
   document.getElementById('folderBar').innerHTML = pills.join('');
@@ -176,10 +177,22 @@ function setFolderFilter(filter) {
 
 async function createFolder() {
   const input = document.getElementById('newFolderName');
+  const btn = document.getElementById('addFolderBtn');
   const name = input.value.trim();
-  if (!name) return;
+  if (!name) {
+    input.focus();
+    input.placeholder = 'Type a name first…';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
   const { data, error } = await supabaseClient.from('lead_folders').insert({ name }).select().single();
-  if (error) { alert('Error creating folder: ' + error.message); return; }
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = '+ Add';
+    alert('Error creating folder: ' + error.message);
+    return;
+  }
   allFolders.push(data);
   renderFolderBar();
 }
@@ -310,6 +323,7 @@ function applyFilter() {
 function startEdit(id) {
   editingId = id;
   applyFilter();
+  attachAddressAutocomplete(`edit-addr-${id}`);
 }
 
 function cancelEdit() {
