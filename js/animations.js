@@ -21,16 +21,18 @@
     });
   });
 
-  /* ---- Stagger index for grouped reveal-up elements ---- */
-  document.querySelectorAll(".reveal-up").forEach((el) => {
-    const siblings = Array.from(el.parentElement.children).filter((c) =>
-      c.classList.contains("reveal-up")
+  /* ---- Stagger index for grouped reveal elements (reveal-up + flicker-in share a sequence) ---- */
+  document.querySelectorAll(".reveal-up, .flicker-in").forEach((el) => {
+    const siblings = Array.from(el.parentElement.children).filter(
+      (c) => c.classList.contains("reveal-up") || c.classList.contains("flicker-in")
     );
     el.style.setProperty("--i", siblings.indexOf(el));
   });
 
   /* ---- Reveal on scroll (IntersectionObserver — no GSAP dependency) ---- */
-  const revealTargets = document.querySelectorAll(".reveal-up, [data-split]");
+  const revealTargets = document.querySelectorAll(
+    ".reveal-up, .flicker-in, [data-split]"
+  );
 
   if (reduceMotion || !("IntersectionObserver" in window)) {
     revealTargets.forEach((el) => el.classList.add("is-visible"));

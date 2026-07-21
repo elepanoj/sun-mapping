@@ -2,15 +2,15 @@
    3 Prong Media — Design Tokens
    ========================================================================== */
 :root {
-  --void: #0b0c0e;
-  --void-soft: #131519;
-  --void-line: rgba(236, 233, 225, 0.1);
+  --void: #06080a;
+  --void-soft: #0d1512;
+  --void-line: rgba(236, 233, 225, 0.09);
   --bone: #ece9e1;
-  --static: #8a8d93;
+  --static: #869087;
 
-  --live: #ff7a3d;
-  --signal: #8b5cff;
-  --ground: #2fd5c8;
+  --live: #39ff6a;
+  --signal: #00e6a8;
+  --ground: #a3ff3d;
 
   --font-display: "Bricolage Grotesque", "Segoe UI", sans-serif;
   --font-body: "Switzer", "Segoe UI", sans-serif;
@@ -50,6 +50,7 @@ button { font: inherit; background: none; border: none; color: inherit; cursor: 
 input, textarea, select { font: inherit; color: inherit; }
 
 section { position: relative; }
+main, footer { position: relative; z-index: 1; }
 
 ::selection { background: var(--live); color: var(--void); }
 
@@ -81,8 +82,9 @@ section { position: relative; }
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--static);
+  color: var(--live);
   margin-bottom: 16px;
+  text-shadow: 0 0 12px rgba(57, 255, 106, 0.5);
 }
 
 /* ==========================================================================
@@ -104,23 +106,99 @@ section { position: relative; }
 .btn--primary {
   background: var(--bone);
   color: var(--void);
-  box-shadow: 0 0 0 0 rgba(255, 122, 61, 0.5);
+  box-shadow: 0 0 0 0 rgba(57, 255, 106, 0.5);
 }
 .btn--primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px -8px rgba(255, 122, 61, 0.55);
+  box-shadow: 0 0 28px 2px rgba(57, 255, 106, 0.55), 0 0 60px 10px rgba(57, 255, 106, 0.25);
   background: var(--live);
   color: var(--void);
+  text-shadow: 0 0 12px rgba(6, 8, 10, 0.4);
 }
 .btn--ghost {
   border: 1px solid var(--void-line);
   color: var(--bone);
 }
 .btn--ghost:hover {
-  border-color: var(--bone);
+  border-color: var(--live);
+  color: var(--live);
   transform: translateY(-2px);
+  box-shadow: 0 0 20px -6px var(--live);
 }
 .btn--sm { padding: 10px 20px; font-size: 12px; }
+
+/* ==========================================================================
+   Ambient background — circuit grid, drifting neon glow, film grain
+   ========================================================================== */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ambient__grid {
+  position: absolute;
+  inset: -2px;
+  background-image:
+    linear-gradient(var(--void-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--void-line) 1px, transparent 1px);
+  background-size: 68px 68px;
+  mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, black, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, black, transparent 75%);
+  opacity: 0.6;
+}
+.ambient__glow {
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  min-width: 420px;
+  min-height: 420px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.16;
+}
+.ambient__glow--a {
+  top: -12%;
+  left: -12%;
+  background: var(--live);
+  animation: drift-a 28s ease-in-out infinite;
+}
+.ambient__glow--b {
+  bottom: -14%;
+  right: -12%;
+  background: var(--signal);
+  animation: drift-b 32s ease-in-out infinite;
+}
+.ambient__noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Desktop-only cursor glow — a soft neon halo trailing the pointer */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 320px;
+  margin-left: -160px;
+  margin-top: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(57, 255, 106, 0.1), transparent 70%);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  will-change: transform;
+}
+.cursor-glow.is-active { opacity: 1; }
+@media (max-width: 900px), (hover: none) {
+  .cursor-glow { display: none; }
+}
 
 /* ==========================================================================
    Scroll spine
@@ -186,7 +264,8 @@ section { position: relative; }
   text-transform: uppercase;
   margin-right: auto;
 }
-.nav__logo { width: 26px; height: 26px; color: var(--bone); }
+.nav__logo { width: 26px; height: 26px; color: var(--bone); transition: color 0.3s ease, filter 0.3s ease; }
+.nav__brand:hover .nav__logo { color: var(--live); filter: drop-shadow(0 0 8px var(--live)); }
 .nav__links {
   display: flex;
   gap: 28px;
@@ -352,6 +431,8 @@ section { position: relative; }
   border: 1px solid currentColor;
   width: fit-content;
   margin-bottom: 24px;
+  box-shadow: 0 0 16px -4px currentColor;
+  text-shadow: 0 0 10px currentColor;
 }
 .prong-panel--live .prong-panel__tag { color: var(--live); }
 .prong-panel--signal .prong-panel__tag { color: var(--signal); }
@@ -387,9 +468,11 @@ section { position: relative; }
   width: fit-content;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--void-line);
-  transition: border-color 0.25s ease, opacity 0.25s ease;
+  transition: border-color 0.25s ease, color 0.25s ease, text-shadow 0.25s ease;
 }
-.prong-panel__link:hover { border-color: var(--bone); }
+.prong-panel--live .prong-panel__link:hover { border-color: var(--live); color: var(--live); text-shadow: 0 0 10px var(--live); }
+.prong-panel--signal .prong-panel__link:hover { border-color: var(--signal); color: var(--signal); text-shadow: 0 0 10px var(--signal); }
+.prong-panel--ground .prong-panel__link:hover { border-color: var(--ground); color: var(--ground); text-shadow: 0 0 10px var(--ground); }
 
 @media (max-width: 900px) {
   .prongs__viewport { overflow: visible; }
@@ -409,6 +492,18 @@ section { position: relative; }
   gap: 60px;
   border-top: 1px solid var(--void-line);
 }
+.detail::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: var(--gutter);
+  width: 120px;
+  height: 1px;
+  box-shadow: 0 0 12px 1px currentColor;
+}
+.detail--live::before { background: var(--live); color: var(--live); }
+.detail--signal::before { background: var(--signal); color: var(--signal); }
+.detail--ground::before { background: var(--ground); color: var(--ground); }
 .detail__lead { margin-top: 20px; color: var(--static); max-width: 34ch; font-size: 1.05rem; }
 .detail--signal .detail__content { order: 2; }
 .detail--signal .detail__grid { order: 1; }
@@ -426,11 +521,16 @@ section { position: relative; }
   border: 1px solid var(--void-line);
   border-radius: 16px;
   background: var(--void-soft);
+  transition: transform 0.35s var(--ease), border-color 0.35s var(--ease), box-shadow 0.35s var(--ease);
 }
-.detail__icon { width: 30px; height: 30px; margin-bottom: 18px; }
+.detail--live .detail__item:hover { transform: translateY(-6px); border-color: var(--live); box-shadow: 0 16px 40px -20px var(--live); }
+.detail--signal .detail__item:hover { transform: translateY(-6px); border-color: var(--signal); box-shadow: 0 16px 40px -20px var(--signal); }
+.detail--ground .detail__item:hover { transform: translateY(-6px); border-color: var(--ground); box-shadow: 0 16px 40px -20px var(--ground); }
+.detail__icon { width: 30px; height: 30px; margin-bottom: 18px; transition: filter 0.35s ease; }
 .detail--live .detail__icon { color: var(--live); }
 .detail--signal .detail__icon { color: var(--signal); }
 .detail--ground .detail__icon { color: var(--ground); }
+.detail__item:hover .detail__icon { filter: drop-shadow(0 0 10px currentColor); }
 .detail__item h3 { font-size: 1.05rem; margin-bottom: 10px; font-weight: 600; }
 .detail__item p { color: var(--static); font-size: 0.92rem; }
 
@@ -534,7 +634,7 @@ section { position: relative; }
   width: fit-content;
   display: inline-block;
 }
-.contact__email:hover { border-color: var(--live); color: var(--live); }
+.contact__email:hover { border-color: var(--live); color: var(--live); text-shadow: 0 0 12px var(--live); }
 
 .form { display: flex; flex-direction: column; gap: 22px; }
 .form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -558,7 +658,7 @@ section { position: relative; }
 }
 .form__field input:focus,
 .form__field select:focus,
-.form__field textarea:focus { border-color: var(--live); outline: none; }
+.form__field textarea:focus { border-color: var(--live); outline: none; box-shadow: 0 0 0 3px rgba(57, 255, 106, 0.15); }
 .form__field textarea { resize: vertical; min-height: 100px; }
 .form .btn { align-self: flex-start; margin-top: 4px; }
 .form__note {
