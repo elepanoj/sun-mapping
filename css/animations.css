@@ -1,0 +1,80 @@
+/* ==========================================================================
+   Reveal states — JS (IntersectionObserver via animations.js) toggles
+   .is-visible; CSS owns the easing.
+   ========================================================================== */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
+}
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* stagger helper — JS sets --i on siblings */
+.reveal-up { transition-delay: calc(var(--i, 0) * 90ms); }
+
+/* ==========================================================================
+   Split headline words
+   ========================================================================== */
+.split-word {
+  display: inline-block;
+  overflow: hidden;
+}
+.split-word > span {
+  display: inline-block;
+  transform: translateY(110%);
+  transition: transform 0.9s var(--ease);
+  transition-delay: calc(var(--i, 0) * 55ms);
+}
+.split-word.is-visible > span {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Hero scroll cue
+   ========================================================================== */
+@keyframes scroll-cue {
+  0% { transform: scaleY(0); transform-origin: top; }
+  45% { transform: scaleY(1); transform-origin: top; }
+  55% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+.hero__scroll-line {
+  animation: scroll-cue 2.4s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   Plug prong ambient charge (after intro draw-on completes)
+   ========================================================================== */
+@keyframes prong-charge {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(0,0,0,0)); }
+  50% { filter: drop-shadow(0 0 9px currentColor); }
+}
+.prong.is-charged { animation: prong-charge 2.6s ease-in-out infinite; }
+
+@keyframes pulse-travel {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-up {
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+  .split-word > span {
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+  .hero__scroll-line,
+  .prong.is-charged {
+    animation: none !important;
+  }
+}
