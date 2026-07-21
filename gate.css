@@ -1,8 +1,0 @@
-#gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
-#gate .gate-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 32px; width: 100%; max-width: 340px; text-align: center; }
-#gate h2 { margin: 0 0 6px; font-size: 1.1rem; }
-#gate p { margin: 0 0 18px; color: var(--muted); font-size: 0.85rem; }
-#gate input { width: 100%; margin-bottom: 12px; text-align: center; }
-#gate button { width: 100%; }
-#gateError { color: var(--bad); font-size: 0.82rem; min-height: 1.2em; margin-top: 10px; }
-#appContent { display: none; }
